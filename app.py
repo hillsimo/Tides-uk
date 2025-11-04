@@ -1,55 +1,68 @@
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime, timedelta, timezone
+import os
+from flask import Flask, render_template_string
+from tide_scrape import fetch_tide_levels
+from tide_svg import generate_next24_svg
+from datetime import datetime, timezone
 
-def fetch_tide_levels():
-    url = "https://www.tidetimes.co.uk/scarborough-tide-times"
-    response = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-    response.raise_for_status()
+app = Flask(__name__)
 
-    soup = BeautifulSoup(response.text, "html.parser")
+@app.route("/render")
+def render_dashboard():
+    try:
+        levels = fetch_tide_levels()
+    except Exception as e:
+        print("⚠️ Tide fetch error:", e)
+        levels = []
 
-    # Look for any tide table, not just class='tideTable'
-    table = soup.find("table")
-    if not table:
-        raise ValueError("Could not locate tide table on tidetimes.co.uk")
-
-    rows = table.find_all("tr")
-    levels = []
     now = datetime.now(timezone.utc)
+    svg_chart = generate_next24_svg(levels, now=now)
 
-    for row in rows:
-        cols = [td.get_text(strip=True) for td in row.find_all("td")]
-        if len(cols) < 3:
-            continue
+    html = f"""
+    <html>
+    <head>
+        <meta charset="utf-8" />
+        <style>
+            body {{
+                background: #f5f5f5;
+                color: #111;
+                font-family: 'Inter', sans-serif;
+                margin: 0;
+                padding: 10px;
+            }}
+            .card {{
+                background: white;
+                border-radius: 8px;
+                padding: 12px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                width: 100%;
+                max-width: 600px;
+                margin: auto;
+            }}
+            h2 {{
+                font-size: 16px;
+                margin-bottom: 8px;
+            }}
+            .tide-chart {{
+                text-align: center;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h2>Scarborough Tides — Next 24 Hours</h2>
+            <div class="tide-chart">{svg_chart}</div>
+        </div>
+    </body>
+    </html>
+    """
+    return render_template_string(html)
 
-        time_str, tide_type, height_str = cols[:3]
-        if not ("high" in tide_type.lower() or "low" in tide_type.lower()):
-            continue
+@app.route("/")
+def index():
+    return "<h3>Tides-UK Flask app is running</h3>"
 
-        try:
-            height = float(height_str.lower().replace("m", "").strip())
-        except ValueError:
-            continue
-
-        # Parse time and assume today’s date
-        try:
-            local_time = datetime.strptime(time_str, "%H:%M")
-        except ValueError:
-            continue
-
-        dt = datetime(now.year, now.month, now.day, local_time.hour, local_time.minute, tzinfo=timezone.utc)
-        levels.append({"time": dt, "height": height})
-
-    # Extend data to cover 24 hours ahead
-    extended = []
-    for i in range(2):
-        for entry in levels:
-            extended.append({
-                "time": entry["time"] + timedelta(days=i),
-                "height": entry["height"]
-            })
-
-    if not extended:
-        print("⚠️ No tide entries parsed — check HTML structure.")
-    return extended
+if __name__ == "__main__":
+    # Render dynamically assigns a port
+    port = int(os.environ.get("PORT", 10000))
+    print(f"Starting Flask on port {port}...")
+    app.run(host="0.0.0.0", port=port)
