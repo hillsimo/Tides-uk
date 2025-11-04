@@ -1,0 +1,37 @@
+{
+  "name": "Scarborough Coastal Conditions",
+  "id": "trmnl-scarborough-coastal",
+  "version": "1.2.0",
+  "description": "Weather + tidal dashboard for Scarborough (next 24h, Celsius).",
+  "author": "Simon",
+  "license": "MIT",
+  "homepage_url": "https://github.com/GwilCodes/TideTrackerUK",
+  "api": {
+    "base_url": "https://<your-deployment-url>",
+    "endpoints": {
+      "health": {
+        "path": "/healthz",
+        "method": "GET"
+      },
+      "dashboard": {
+        "path": "/dashboard",
+        "method": "GET"
+      },
+      "render": {
+        "path": "/render",
+        "method": "GET"
+      }
+    }
+  },
+  "display": {
+    "type": "html",
+    "refresh_interval": 1800,
+    "title": "Scarborough Coastal Conditions",
+    "url_path": "/render"
+  },
+  "env": {
+    "required": [
+      "ADMIRALTY_API_KEY"
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: scarborough-coastal-conditions
+    env: docker
+    repo: https://github.com/<your-username>/<your-repo>
+    branch: main
+    plan: free
+    # If you prefer a static build on Render using Dockerfile, Render will auto-detect Dockerfile.
+    # Set any environment variables in the Render dashboard (ADMIRALTY_API_KEY).
