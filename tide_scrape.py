@@ -1,50 +1,43 @@
+import os
 import requests
-from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
 
-TIDE_URL = "https://www.tidetimes.co.uk/scarborough-tide-times"
+API_KEY = os.getenv("WORLD_TIDES_KEY")
+# Scarborough coordinates
+LAT, LON = 54.283, -0.396
 
 def fetch_tide_levels():
-    """Scrape tide data for Scarborough from tidetimes.co.uk"""
-    try:
-        r = requests.get(TIDE_URL, timeout=10)
-        r.raise_for_status()
-    except Exception as e:
-        print("❌ Error fetching tide data:", e)
+    """Fetch Scarborough tide data from WorldTides API"""
+    if not API_KEY:
+        print("❌ WORLD_TIDES_KEY not set.")
         return []
 
-    soup = BeautifulSoup(r.text, "html.parser")
+    now = datetime.now(timezone.utc)
+    to_time = now + timedelta(hours=24)
 
-    # Find the main tide table — usually the first <table> under .tideTable
-    table = soup.select_one("table.tidetimes") or soup.find("table")
+    url = (
+        f"https://www.worldtides.info/api/v3?extremes&lat={LAT}&lon={LON}"
+        f"&start={int(now.timestamp())}&length=86400&key={API_KEY}"
+    )
 
-    if not table:
-        print("❌ Could not find tide table.")
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        print("❌ Error fetching from WorldTides:", e)
         return []
 
     tides = []
-    rows = table.find_all("tr")
-    for row in rows:
-        cols = [c.get_text(strip=True) for c in row.find_all("td")]
-        if len(cols) >= 2:
-            event_type = cols[0]
-            event_time = cols[1]
-            event_height = cols[2] if len(cols) > 2 else ""
+    for event in data.get("extremes", []):
+        tide_type = event["type"]
+        tide_time = datetime.fromtimestamp(event["dt"], tz=timezone.utc)
+        height = round(event.get("height", 0), 2)
+        tides.append({
+            "type": tide_type.title(),
+            "time": tide_time.isoformat(),
+            "height": f"{height:.2f} m"
+        })
 
-            if any(k in event_type.lower() for k in ["high", "low"]):
-                try:
-                    # Parse time like "01:24am" → datetime
-                    t = datetime.strptime(event_time.lower(), "%I:%M%p")
-                    now = datetime.now(timezone.utc)
-                    tide_dt = now.replace(hour=t.hour, minute=t.minute, second=0, microsecond=0)
-                    tides.append({
-                        "type": event_type.title(),
-                        "time": tide_dt.isoformat(),
-                        "height": event_height
-                    })
-                except Exception as e:
-                    print("⚠️ Parse error:", e)
-                    continue
-
-    print(f"✅ Scraped {len(tides)} tide entries.")
+    print(f"✅ Loaded {len(tides)} tide entries from WorldTides.")
     return tides
