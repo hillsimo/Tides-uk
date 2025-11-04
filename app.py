@@ -62,7 +62,6 @@ def index():
     return "<h3>Tides-UK Flask app is running</h3>"
 
 if __name__ == "__main__":
-    # Render dynamically assigns a port
     port = int(os.environ.get("PORT", 10000))
     print(f"Starting Flask on port {port}...")
     app.run(host="0.0.0.0", port=port)
